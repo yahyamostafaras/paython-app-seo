@@ -23,6 +23,49 @@ def inject_custom_css():
         """,
         unsafe_allow_html=True
     )
+def extract_seo_data(html):
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Title extraction
+    title = soup.title.string.strip() if soup.title else "Title not found"
+
+    # Meta description extraction
+    meta_desc_tag = soup.find('meta', attrs={'name': 'description'})
+    meta_desc = meta_desc_tag['content'].strip() if meta_desc_tag else "Meta description not found"
+
+    # Canonical URL extraction
+    canonical_tag = soup.find('link', rel='canonical')
+    canonical_url = canonical_tag['href'].strip() if canonical_tag else "Canonical not found"
+
+    # H1 extraction
+    h1_tag = soup.find('h1')
+    h1 = h1_tag.text.strip() if h1_tag else "H1 not found"
+
+    # Word count
+    word_count = len(soup.get_text().split())
+
+    # Image ALT analysis
+    images = soup.find_all('img')
+    missing_alt = sum(1 for img in images if not img.get('alt'))
+
+    # Heading structure
+    headings = {f"H{i}": len(soup.find_all(f"h{i}")) for i in range(1, 7)}
+
+    # Keyword density (most frequent words)
+    words = soup.get_text().lower().split()
+    word_freq = {word: words.count(word) for word in set(words)}
+    sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]  # Top 10 words
+
+    return {
+        "title": title,
+        "meta_description": meta_desc,
+        "canonical": canonical_url,
+        "h1": h1,
+        "word_count": word_count,
+        "missing_alt": missing_alt,
+        "headings": headings,
+        "keyword_density": sorted_keywords
+    }
 
 # Fetch HTML from the given URL
 def fetch_html(url):
