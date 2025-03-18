@@ -4,28 +4,19 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from io import BytesIO
 
-# Inject Custom CSS for Modern Styling
+# Inject Custom CSS for Styling
 def inject_custom_css():
     st.markdown(
         """
         <style>
-        /* Center the Title and Content */
         .stTitle { text-align: center !important; }
         .stButton { text-align: center !important; display: flex; justify-content: center; }
         .stTextInput>div>div>input { text-align: center !important; }
-
-        /* Custom Fonts & Styling */
         body { font-family: 'Arial', sans-serif; background-color: #f8f9fa; color: #333; }
         .reportview-container { padding-top: 2rem; }
-        .stMarkdown h2 { color: #007bff; }
-
-        /* SEO Score Styling */
         .seo-score { font-size: 2rem; font-weight: bold; text-align: center; color: #28a745; }
-
-        /* Dark Mode (Optional) */
         @media (prefers-color-scheme: dark) {
             body { background-color: #121212; color: #ddd; }
-            .stMarkdown h2 { color: #1abc9c; }
             .seo-score { color: #1abc9c; }
         }
         </style>
@@ -36,11 +27,14 @@ def inject_custom_css():
 # Fetch HTML from the given URL
 def fetch_html(url):
     try:
-        response = requests.get(url, timeout=10)
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url  # Auto-correct missing protocol
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         return response.text
     except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching the URL: {e}")
+        st.error(f"❌ Error fetching the URL: {e}")
         return None
 
 # Extract SEO-related data
@@ -59,7 +53,8 @@ def extract_seo_data(html):
     h1 = h1_tag.text.strip() if h1_tag else "H1 not found"
 
     # Word count
-    word_count = len(soup.get_text().split())
+    text = soup.get_text(separator=' ').strip()
+    word_count = len(text.split())
 
     # Image ALT analysis
     images = soup.find_all('img')
@@ -68,9 +63,9 @@ def extract_seo_data(html):
     # Heading structure
     headings = {f"H{i}": len(soup.find_all(f"h{i}")) for i in range(1, 7)}
 
-    # Keyword density (most frequent words)
-    words = soup.get_text().lower().split()
-    word_freq = {word: words.count(word) for word in set(words)}
+    # Keyword density (Top 10 words, excluding stopwords)
+    words = text.lower().split()
+    word_freq = {word: words.count(word) for word in set(words) if len(word) > 3}  # Ignore short words
     sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]  # Top 10 words
 
     return {
@@ -145,10 +140,10 @@ def convert_to_excel(seo_data):
 def main():
     inject_custom_css()  # Apply Custom CSS
     
-    st.title("SEO Analyzer by Yahya")
+    st.title("🔍 SEO Analyzer by Yahya")
     url = st.text_input("Enter a webpage URL:", key="url_input")
 
-    if st.button("Extract SEO Data") or st.session_state.get("enter_pressed"):
+    if st.button("Extract SEO Data"):
         if url:
             html = fetch_html(url)
             if html:
@@ -182,8 +177,6 @@ def main():
                 # Download button for Excel
                 excel_data = convert_to_excel(seo_data)
                 st.download_button("📥 Download SEO Report", excel_data, "SEO_Report.xlsx")
-
-    st.session_state["enter_pressed"] = False
 
 if __name__ == "__main__":
     main()
