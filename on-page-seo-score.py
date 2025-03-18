@@ -2,6 +2,36 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 
+# Inject Custom CSS for Modern Styling
+def inject_custom_css():
+    st.markdown(
+        """
+        <style>
+        /* Center the Title and Content */
+        .stTitle { text-align: center !important; }
+        .stButton { text-align: center !important; display: flex; justify-content: center; }
+        .stTextInput>div>div>input { text-align: center !important; }
+        
+        /* Custom Fonts & Styling */
+        body { font-family: 'Arial', sans-serif; background-color: #f8f9fa; color: #333; }
+        .reportview-container { padding-top: 2rem; }
+        .stMarkdown h2 { color: #007bff; }
+        
+        /* SEO Score Styling */
+        .seo-score { font-size: 2rem; font-weight: bold; text-align: center; color: #28a745; }
+        
+        /* Dark Mode (Optional) */
+        @media (prefers-color-scheme: dark) {
+            body { background-color: #121212; color: #ddd; }
+            .stMarkdown h2 { color: #1abc9c; }
+            .seo-score { color: #1abc9c; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Fetch HTML from the given URL
 def fetch_html(url):
     try:
         response = requests.get(url, timeout=10)
@@ -11,122 +41,122 @@ def fetch_html(url):
         st.error(f"Error fetching the URL: {e}")
         return None
 
+# Extract SEO-related data
 def extract_seo_data(html):
     soup = BeautifulSoup(html, 'html.parser')
-    title = soup.title.string if soup.title else "Title not found"
-    
+
+    # Title extraction
+    title = soup.title.string.strip() if soup.title else "Title not found"
+
+    # Meta description extraction
     meta_desc_tag = soup.find('meta', attrs={'name': 'description'})
-    meta_desc = meta_desc_tag['content'] if meta_desc_tag else "Meta description not found"
-    
-    h1_tags = soup.find_all('h1')
-    h1 = h1_tags[0].text.strip() if h1_tags else "H1 not found"
-    h1_count = len(h1_tags)
-    
+    meta_desc = meta_desc_tag['content'].strip() if meta_desc_tag else "Meta description not found"
+
+    # H1 extraction
+    h1_tag = soup.find('h1')
+    h1 = h1_tag.text.strip() if h1_tag else "H1 not found"
+
+    # Word count
     word_count = len(soup.get_text().split())
+
+    # Image ALT analysis
     images = soup.find_all('img')
     missing_alt = sum(1 for img in images if not img.get('alt'))
-    
-    canonical_tag = soup.find('link', attrs={'rel': 'canonical'})
-    canonical = canonical_tag['href'] if canonical_tag else "Canonical tag not found"
-    
-    viewport_meta = soup.find('meta', attrs={'name': 'viewport'})
-    mobile_friendly = "Yes" if viewport_meta else "No viewport meta tag found"
-    
-    schema_markup = "Yes" if soup.find('script', attrs={'type': 'application/ld+json'}) else "No schema markup found"
-    
+
+    # Heading structure
+    headings = {f"H{i}": len(soup.find_all(f"h{i}")) for i in range(1, 7)}
+
     return {
         "title": title,
         "meta_description": meta_desc,
         "h1": h1,
-        "h1_count": h1_count,
         "word_count": word_count,
         "missing_alt": missing_alt,
-        "canonical": canonical,
-        "mobile_friendly": mobile_friendly,
-        "schema_markup": schema_markup
+        "headings": headings
     }
 
+# Calculate SEO Score & Improvement Suggestions
 def calculate_seo_score(seo_data):
     score = 0
-    improvements = []
-    
-    if 50 <= len(seo_data["title"]) <= 60:
-        score += 10
-    else:
-        improvements.append("Optimize title length (50-60 characters).")
-    
-    if 120 <= len(seo_data["meta_description"]) <= 160:
-        score += 10
-    else:
-        improvements.append("Optimize meta description (120-160 characters).")
-    
-    if seo_data["h1"] != "H1 not found":
-        score += 10
-    else:
-        improvements.append("Ensure an H1 tag is present on the page.")
-    
-    if seo_data["h1_count"] == 1:
-        score += 10
-    else:
-        improvements.append("Avoid multiple H1 tags. Use only one per page.")
-    
-    if seo_data["word_count"] >= 300:
-        score += 10
-    else:
-        improvements.append("Increase content length (minimum 300 words).")
-    
-    if seo_data["missing_alt"] == 0:
-        score += 10
-    else:
-        improvements.append(f"{seo_data['missing_alt']} images are missing ALT attributes.")
-    
-    if seo_data["canonical"] != "Canonical tag not found":
-        score += 10
-    else:
-        improvements.append("Add a canonical tag to prevent duplicate content issues.")
-    
-    if seo_data["mobile_friendly"] == "Yes":
-        score += 10
-    else:
-        improvements.append("Ensure mobile-friendliness by adding a viewport meta tag.")
-    
-    if seo_data["schema_markup"] == "Yes":
-        score += 10
-    else:
-        improvements.append("Consider adding schema markup for better SEO.")
-    
-    return score, improvements
+    suggestions = []
 
+    # Title length
+    title_len = len(seo_data["title"])
+    if 50 <= title_len <= 60:
+        score += 15
+    else:
+        suggestions.append("✅ Optimize Title: Keep it between 50-60 characters.")
+
+    # Meta description length
+    meta_len = len(seo_data["meta_description"])
+    if 120 <= meta_len <= 160:
+        score += 15
+    else:
+        suggestions.append("✅ Improve Meta Description: Keep it between 120-160 characters.")
+
+    # H1 presence
+    if seo_data["h1"] != "H1 not found":
+        score += 15
+    else:
+        suggestions.append("✅ Add an H1 tag: Every page should have a clear H1.")
+
+    # Word count
+    if seo_data["word_count"] >= 300:
+        score += 15
+    else:
+        suggestions.append("✅ Add More Content: Aim for at least 300 words for SEO-friendly content.")
+
+    # Image ALT attributes
+    if seo_data["missing_alt"] == 0:
+        score += 15
+    else:
+        suggestions.append(f"✅ Fix ALT Tags: {seo_data['missing_alt']} images are missing ALT attributes.")
+
+    # H2 & H3 presence (for structure)
+    if seo_data["headings"]["H2"] > 0 and seo_data["headings"]["H3"] > 0:
+        score += 10
+    else:
+        suggestions.append("✅ Improve Headings: Add H2s and H3s for better content structure.")
+
+    # Total possible score: 100
+    return score, suggestions
+
+# Streamlit UI
 def main():
-    st.title("Advanced SEO Analyzer")
-    url = st.text_input("Enter a webpage URL:")
+    inject_custom_css()  # Apply Custom CSS
     
-    if st.button("Analyze SEO") or st.session_state.get("enter_pressed"):
+    st.title("SEO Analyzer by Yahya")
+    url = st.text_input("Enter a webpage URL:", key="url_input")
+
+    if st.button("Extract SEO Data") or st.session_state.get("enter_pressed"):
         if url:
             html = fetch_html(url)
             if html:
                 seo_data = extract_seo_data(html)
-                seo_score, improvements = calculate_seo_score(seo_data)
-                
-                st.subheader("SEO Score: ")
-                st.markdown(f"### {seo_score} / 100")
-                
+                seo_score, suggestions = calculate_seo_score(seo_data)
+
+                # Display results
+                st.subheader("🔍 SEO Score:")
+                st.markdown(f"<div class='seo-score'>{seo_score} / 100</div>", unsafe_allow_html=True)
+
                 st.write("**Title:**", seo_data["title"])
                 st.write("**Meta Description:**", seo_data["meta_description"])
                 st.write("**H1:**", seo_data["h1"])
-                st.write(f"**H1 Count:** {seo_data['h1_count']}")
                 st.write(f"**Word Count:** {seo_data['word_count']}")
                 st.write(f"**Images Missing ALT:** {seo_data['missing_alt']}")
-                st.write(f"**Canonical URL:** {seo_data['canonical']}")
-                st.write(f"**Mobile Friendly:** {seo_data['mobile_friendly']}")
-                st.write(f"**Schema Markup Present:** {seo_data['schema_markup']}")
-                
-                if improvements:
-                    st.subheader("SEO Improvements Suggested:")
-                    for improvement in improvements:
-                        st.write(f"- {improvement}")
-    
-    st.session_state["enter_pressed"] = st.text_input("Press ENTER to submit", key="enter_key")
+
+                st.subheader("📊 Heading Structure:")
+                for h, count in seo_data["headings"].items():
+                    st.write(f"**{h}:** {count}")
+
+                # Display improvement suggestions
+                if suggestions:
+                    st.subheader("🚀 Suggested SEO Improvements:")
+                    for suggestion in suggestions:
+                        st.write("- " + suggestion)
+
+    # Fix: Removed the extra input bar
+    st.session_state["enter_pressed"] = False
 
 if __name__ == "__main__":
     main()
