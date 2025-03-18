@@ -1,189 +1,168 @@
 import streamlit as st
 import requests
-import pandas as pd
 from bs4 import BeautifulSoup
-from io import BytesIO
+import json
+from urllib.parse import urlparse, urljoin
+import pandas as pd
 
-# Inject Custom CSS for Modern Styling
-def inject_custom_css():
-    st.markdown(
-        """
-        <style>
-        /* Center the Title and Content */
-        .stTitle { text-align: center !important; }
-        .stButton { text-align: center !important; display: flex; justify-content: center; }
-        .stTextInput>div>div>input { text-align: center !important; }
-
-        /* Custom Fonts & Styling */
-        body { font-family: 'Arial', sans-serif; background-color: #f8f9fa; color: #333; }
-        .reportview-container { padding-top: 2rem; }
-        .stMarkdown h2 { color: #007bff; }
-
-        /* SEO Score Styling */
-        .seo-score { font-size: 2rem; font-weight: bold; text-align: center; color: #28a745; }
-
-        /* Dark Mode (Optional) */
-        @media (prefers-color-scheme: dark) {
-            body { background-color: #121212; color: #ddd; }
-            .stMarkdown h2 { color: #1abc9c; }
-            .seo-score { color: #1abc9c; }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-# Fetch HTML from the given URL
 def fetch_html(url):
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         response.raise_for_status()
         return response.text
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching the URL: {e}")
         return None
 
-# Extract SEO-related data
-def extract_seo_data(html):
+def extract_seo_data(html, url):
     soup = BeautifulSoup(html, 'html.parser')
-
-    # Title extraction
+    
     title = soup.title.string.strip() if soup.title else "Title not found"
-
-    # Meta description extraction
+    
     meta_desc_tag = soup.find('meta', attrs={'name': 'description'})
     meta_desc = meta_desc_tag['content'].strip() if meta_desc_tag else "Meta description not found"
-
-    # H1 extraction
+    
     h1_tag = soup.find('h1')
     h1 = h1_tag.text.strip() if h1_tag else "H1 not found"
-
-    # Word count
+    
     word_count = len(soup.get_text().split())
-
-    # Image ALT analysis
     images = soup.find_all('img')
     missing_alt = sum(1 for img in images if not img.get('alt'))
-
-    # Heading structure
-    headings = {f"H{i}": len(soup.find_all(f"h{i}")) for i in range(1, 7)}
-
-    # Keyword density (most frequent words)
-    words = soup.get_text().lower().split()
-    word_freq = {word: words.count(word) for word in set(words)}
-    sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]  # Top 10 words
-
+    
+    canonical_tag = soup.find('link', rel='canonical')
+    canonical_url = canonical_tag['href'] if canonical_tag else "Canonical URL not found"
+    
+    robots_tag = soup.find('meta', attrs={'name': 'robots'})
+    robots_content = robots_tag['content'] if robots_tag else "Indexable"
+    
+    publisher_tag = soup.find('meta', attrs={'name': 'publisher'})
+    publisher = publisher_tag['content'] if publisher_tag else "Publisher not found"
+    
+    json_ld_data = []
+    for script in soup.find_all('script', {'type': 'application/ld+json'}):
+        try:
+            json_ld_data.append(json.loads(script.string))
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    internal_links, external_links, broken_links = analyze_links(soup, url)
+    
     return {
         "title": title,
         "meta_description": meta_desc,
         "h1": h1,
         "word_count": word_count,
         "missing_alt": missing_alt,
-        "headings": headings,
-        "keyword_density": sorted_keywords
+        "canonical_url": canonical_url,
+        "robots": robots_content,
+        "publisher": publisher,
+        "structured_data": json_ld_data,
+        "total_links": len(internal_links) + len(external_links),
+        "internal_links": len(internal_links),
+        "external_links": len(external_links),
+        "broken_links": len(broken_links),
     }
 
-# Calculate SEO Score & Improvement Suggestions
+def analyze_links(soup, base_url):
+    parsed_base = urlparse(base_url)
+    internal_links = set()
+    external_links = set()
+    broken_links = set()
+    
+    for link in soup.find_all('a', href=True):
+        href = link['href']
+        full_url = urljoin(base_url, href)
+        parsed_url = urlparse(full_url)
+        
+        if parsed_url.netloc == parsed_base.netloc:
+            internal_links.add(full_url)
+        else:
+            external_links.add(full_url)
+        
+        try:
+            response = requests.head(full_url, allow_redirects=True, timeout=5)
+            if response.status_code >= 400:
+                broken_links.add(full_url)
+        except requests.RequestException:
+            broken_links.add(full_url)
+    
+    return internal_links, external_links, broken_links
+
 def calculate_seo_score(seo_data):
     score = 0
-    suggestions = []
-
-    # Title length
-    title_len = len(seo_data["title"])
-    if 50 <= title_len <= 60:
+    improvements = []
+    
+    if 50 <= len(seo_data["title"]) <= 60:
         score += 15
     else:
-        suggestions.append("✅ Optimize Title: Keep it between 50-60 characters.")
-
-    # Meta description length
-    meta_len = len(seo_data["meta_description"])
-    if 120 <= meta_len <= 160:
+        improvements.append("Title length should be between 50-60 characters.")
+    
+    if 120 <= len(seo_data["meta_description"]) <= 160:
         score += 15
     else:
-        suggestions.append("✅ Improve Meta Description: Keep it between 120-160 characters.")
-
-    # H1 presence
+        improvements.append("Meta description should be between 120-160 characters.")
+    
     if seo_data["h1"] != "H1 not found":
-        score += 15
+        score += 10
     else:
-        suggestions.append("✅ Add an H1 tag: Every page should have a clear H1.")
-
-    # Word count
+        improvements.append("Add an H1 tag.")
+    
     if seo_data["word_count"] >= 300:
         score += 15
     else:
-        suggestions.append("✅ Add More Content: Aim for at least 300 words for SEO-friendly content.")
-
-    # Image ALT attributes
+        improvements.append("Increase content length to at least 300 words.")
+    
     if seo_data["missing_alt"] == 0:
-        score += 15
-    else:
-        suggestions.append(f"✅ Fix ALT Tags: {seo_data['missing_alt']} images are missing ALT attributes.")
-
-    # H2 & H3 presence (for structure)
-    if seo_data["headings"]["H2"] > 0 and seo_data["headings"]["H3"] > 0:
         score += 10
     else:
-        suggestions.append("✅ Improve Headings: Add H2s and H3s for better content structure.")
-
-    # Keyword density optimization
-    top_keywords = [word for word, _ in seo_data["keyword_density"][:5]]
-    suggestions.append(f"🔍 Top Keywords: {', '.join(top_keywords)} (Ensure they're relevant & used naturally).")
-
-    return score, suggestions
-
-# Convert SEO Data to Excel
-def convert_to_excel(seo_data):
-    output = BytesIO()
-    df = pd.DataFrame.from_dict(seo_data, orient='index', columns=['Value'])
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name="SEO Data")
-    output.seek(0)
-    return output
-
-# Streamlit UI
-def main():
-    inject_custom_css()  # Apply Custom CSS
+        improvements.append(f"Add ALT text to {seo_data['missing_alt']} images.")
     
-    st.title("SEO Analyzer by Yahya")
-    url = st.text_input("Enter a webpage URL:", key="url_input")
+    if seo_data["broken_links"] == 0:
+        score += 10
+    else:
+        improvements.append(f"Fix {seo_data['broken_links']} broken links.")
+    
+    if seo_data["robots"].lower() == "indexable":
+        score += 10
+    else:
+        improvements.append("Check robots meta tag settings.")
+    
+    return score, improvements
 
-    if st.button("Extract SEO Data") or st.session_state.get("enter_pressed"):
+def main():
+    st.title("SEO Audit Tool by Yahya")
+    url = st.text_input("Enter a webpage URL:")
+    
+    if st.button("Analyze SEO"):
         if url:
             html = fetch_html(url)
             if html:
-                seo_data = extract_seo_data(html)
-                seo_score, suggestions = calculate_seo_score(seo_data)
-
-                # Display results
-                st.subheader("🔍 SEO Score:")
-                st.markdown(f"<div class='seo-score'>{seo_score} / 100</div>", unsafe_allow_html=True)
-
+                seo_data = extract_seo_data(html, url)
+                seo_score, improvements = calculate_seo_score(seo_data)
+                
+                st.subheader("SEO Score: ")
+                st.markdown(f"### {seo_score} / 100")
+                
                 st.write("**Title:**", seo_data["title"])
                 st.write("**Meta Description:**", seo_data["meta_description"])
                 st.write("**H1:**", seo_data["h1"])
                 st.write(f"**Word Count:** {seo_data['word_count']}")
                 st.write(f"**Images Missing ALT:** {seo_data['missing_alt']}")
-
-                st.subheader("📊 Heading Structure:")
-                for h, count in seo_data["headings"].items():
-                    st.write(f"**{h}:** {count}")
-
-                st.subheader("🔑 Keyword Density (Top 10):")
-                for word, count in seo_data["keyword_density"]:
-                    st.write(f"**{word}**: {count} times")
-
-                # Display improvement suggestions
-                if suggestions:
-                    st.subheader("🚀 Suggested SEO Improvements:")
-                    for suggestion in suggestions:
-                        st.write("- " + suggestion)
-
-                # Download button for Excel
-                excel_data = convert_to_excel(seo_data)
-                st.download_button("📥 Download SEO Report", excel_data, "SEO_Report.xlsx")
-
-    st.session_state["enter_pressed"] = False
+                st.write(f"**Canonical URL:** {seo_data['canonical_url']}")
+                st.write(f"**Robots Tag:** {seo_data['robots']}")
+                st.write(f"**Publisher:** {seo_data['publisher']}")
+                st.write(f"**Total Links:** {seo_data['total_links']}")
+                st.write(f"**Internal Links:** {seo_data['internal_links']}")
+                st.write(f"**External Links:** {seo_data['external_links']}")
+                st.write(f"**Broken Links:** {seo_data['broken_links']}")
+                
+                st.subheader("Structured Data (JSON-LD)")
+                st.json(seo_data["structured_data"])
+                
+                if improvements:
+                    st.subheader("Suggestions for Improvement")
+                    for improvement in improvements:
+                        st.write(f"- {improvement}")
 
 if __name__ == "__main__":
     main()
