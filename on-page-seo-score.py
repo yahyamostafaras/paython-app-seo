@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
+import pandas as pd
 from bs4 import BeautifulSoup
+from io import BytesIO
 
 # Inject Custom CSS for Modern Styling
 def inject_custom_css():
@@ -11,15 +13,15 @@ def inject_custom_css():
         .stTitle { text-align: center !important; }
         .stButton { text-align: center !important; display: flex; justify-content: center; }
         .stTextInput>div>div>input { text-align: center !important; }
-        
+
         /* Custom Fonts & Styling */
         body { font-family: 'Arial', sans-serif; background-color: #f8f9fa; color: #333; }
         .reportview-container { padding-top: 2rem; }
         .stMarkdown h2 { color: #007bff; }
-        
+
         /* SEO Score Styling */
         .seo-score { font-size: 2rem; font-weight: bold; text-align: center; color: #28a745; }
-        
+
         /* Dark Mode (Optional) */
         @media (prefers-color-scheme: dark) {
             body { background-color: #121212; color: #ddd; }
@@ -66,13 +68,19 @@ def extract_seo_data(html):
     # Heading structure
     headings = {f"H{i}": len(soup.find_all(f"h{i}")) for i in range(1, 7)}
 
+    # Keyword density (most frequent words)
+    words = soup.get_text().lower().split()
+    word_freq = {word: words.count(word) for word in set(words)}
+    sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]  # Top 10 words
+
     return {
         "title": title,
         "meta_description": meta_desc,
         "h1": h1,
         "word_count": word_count,
         "missing_alt": missing_alt,
-        "headings": headings
+        "headings": headings,
+        "keyword_density": sorted_keywords
     }
 
 # Calculate SEO Score & Improvement Suggestions
@@ -118,8 +126,20 @@ def calculate_seo_score(seo_data):
     else:
         suggestions.append("✅ Improve Headings: Add H2s and H3s for better content structure.")
 
-    # Total possible score: 100
+    # Keyword density optimization
+    top_keywords = [word for word, _ in seo_data["keyword_density"][:5]]
+    suggestions.append(f"🔍 Top Keywords: {', '.join(top_keywords)} (Ensure they're relevant & used naturally).")
+
     return score, suggestions
+
+# Convert SEO Data to Excel
+def convert_to_excel(seo_data):
+    output = BytesIO()
+    df = pd.DataFrame.from_dict(seo_data, orient='index', columns=['Value'])
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, sheet_name="SEO Data")
+    output.seek(0)
+    return output
 
 # Streamlit UI
 def main():
@@ -149,13 +169,20 @@ def main():
                 for h, count in seo_data["headings"].items():
                     st.write(f"**{h}:** {count}")
 
+                st.subheader("🔑 Keyword Density (Top 10):")
+                for word, count in seo_data["keyword_density"]:
+                    st.write(f"**{word}**: {count} times")
+
                 # Display improvement suggestions
                 if suggestions:
                     st.subheader("🚀 Suggested SEO Improvements:")
                     for suggestion in suggestions:
                         st.write("- " + suggestion)
 
-    # Fix: Removed the extra input bar
+                # Download button for Excel
+                excel_data = convert_to_excel(seo_data)
+                st.download_button("📥 Download SEO Report", excel_data, "SEO_Report.xlsx")
+
     st.session_state["enter_pressed"] = False
 
 if __name__ == "__main__":
