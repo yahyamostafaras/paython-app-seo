@@ -89,7 +89,9 @@ def extract_seo_data(html, url):
     sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
     
     indexability_data = extract_indexability_data(url, soup)
-    
+
+    seo_score = calculate_seo_score(title, meta_desc, h1, word_count, missing_alt, indexability_data)
+
     return {
         "title": title,
         "meta_description": meta_desc,
@@ -98,8 +100,34 @@ def extract_seo_data(html, url):
         "missing_alt": missing_alt,
         "headings": headings,
         "keyword_density": sorted_keywords,
-        "indexability": indexability_data
+        "indexability": indexability_data,
+        "seo_score": seo_score
     }
+
+# Calculate SEO Score
+def calculate_seo_score(title, meta_desc, h1, word_count, missing_alt, indexability):
+    score = 100
+
+    if title == "Title not found":
+        score -= 10
+    if meta_desc == "Meta description not found":
+        score -= 10
+    if h1 == "H1 not found":
+        score -= 10
+    if word_count < 300:
+        score -= 15
+    if missing_alt > 0:
+        score -= 10
+    if indexability["Canonical URL"] == "Missing":
+        score -= 10
+    if indexability["Robots Meta Tag"] == "Missing":
+        score -= 5
+    if indexability["X-Robots-Tag HTTP"] == "Missing":
+        score -= 5
+    if indexability["Hreflangs"] == "Missing":
+        score -= 5
+
+    return max(score, 0)
 
 # Generate To-Do List
 def generate_todo_list(seo_data):
@@ -148,12 +176,14 @@ def main():
                 seo_data = extract_seo_data(html, url)
                 
                 st.subheader("🔍 SEO Score:")
+                st.markdown(f"<p class='seo-score'>{seo_data['seo_score']} / 100</p>", unsafe_allow_html=True)
+                
                 st.write(f"**Title:** {seo_data['title']}")
                 st.write(f"**Meta Description:** {seo_data['meta_description']}")
                 st.write(f"**H1:** {seo_data['h1']}")
                 st.write(f"**Word Count:** {seo_data['word_count']}")
                 st.write(f"**Images Missing ALT:** {seo_data['missing_alt']}")
-                
+
                 st.subheader("📊 Heading Structure:")
                 for h, count in seo_data["headings"].items():
                     st.write(f"**{h}:** {count}")
@@ -162,23 +192,15 @@ def main():
                 for word, count in seo_data["keyword_density"]:
                     st.write(f"**{word}**: {count} times")
                 
-                # Indexability Section
                 st.subheader("🛠️ Indexability")
                 indexability = seo_data["indexability"]
-                st.write(f"**Canonical URL:** {indexability['Canonical URL']}")
-                st.write(f"**Self-Canonical:** {indexability['Self-Canonical']}")
-                st.write(f"**Robots.txt:** {indexability['Robots.txt']}")
-                st.write(f"**Robots Meta Tag:** {indexability['Robots Meta Tag']}")
-                st.write(f"**X-Robots-Tag HTTP:** {indexability['X-Robots-Tag HTTP']}")
-                st.write(f"**Sitemap:** {indexability['Sitemap']}")
-                st.write(f"**Hreflangs:** {indexability['Hreflangs']}")
+                for key, value in indexability.items():
+                    st.write(f"**{key}:** {value}")
 
-                # To-Do List Section
                 st.subheader("✅ SEO To-Do List")
                 todo_list = generate_todo_list(seo_data)
                 if todo_list:
-                    df = pd.DataFrame(todo_list, columns=["Issue", "Recommended Action"])
-                    st.table(df)
+                    st.table(pd.DataFrame(todo_list, columns=["Issue", "Recommended Action"]))
                 else:
                     st.success("No major SEO issues found!")
 
