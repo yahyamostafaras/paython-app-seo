@@ -9,25 +9,13 @@ def inject_custom_css():
     st.markdown(
         """
         <style>
-        /* Center the Title and Content */
         .stTitle { text-align: center !important; }
         .stButton { text-align: center !important; display: flex; justify-content: center; }
         .stTextInput>div>div>input { text-align: center !important; }
-        
-        /* Custom Fonts & Styling */
         body { font-family: 'Arial', sans-serif; background-color: #f8f9fa; color: #333; }
         .reportview-container { padding-top: 2rem; }
         .stMarkdown h2 { color: #007bff; }
-        
-        /* SEO Score Styling */
         .seo-score { font-size: 2rem; font-weight: bold; text-align: center; color: #28a745; }
-        
-        /* Dark Mode (Optional) */
-        @media (prefers-color-scheme: dark) {
-            body { background-color: #121212; color: #ddd; }
-            .stMarkdown h2 { color: #1abc9c; }
-            .seo-score { color: #1abc9c; }
-        }
         </style>
         """,
         unsafe_allow_html=True
@@ -46,45 +34,22 @@ def fetch_html(url):
 # Extract SEO-related data
 def extract_seo_data(html, url):
     soup = BeautifulSoup(html, 'html.parser')
-    
-    # Title extraction
     title = soup.title.string.strip() if soup.title else "Title not found"
-    
-    # Meta Description Extraction
     meta_desc_tag = soup.find('meta', attrs={'name': 'description'})
     og_desc_tag = soup.find('meta', attrs={'property': 'og:description'})
-    
-    if meta_desc_tag and meta_desc_tag.get('content'):
-        meta_desc = meta_desc_tag['content'].strip()
-    elif og_desc_tag and og_desc_tag.get('content'):
-        meta_desc = og_desc_tag['content'].strip()
-    else:
-        meta_desc = "Meta description not found"
-    
-    # Canonical URL Extraction
+    meta_desc = meta_desc_tag['content'].strip() if meta_desc_tag and meta_desc_tag.get('content') else og_desc_tag['content'].strip() if og_desc_tag and og_desc_tag.get('content') else "Meta description not found"
     canonical_tag = soup.find('link', rel='canonical')
     canonical_url = canonical_tag['href'].strip() if canonical_tag else "Canonical tag not found"
     is_canonical_correct = "✅ Matches Entered URL" if canonical_url == url else "❌ Does Not Match Entered URL"
-    
-    # H1 extraction
     h1_tag = soup.find('h1')
     h1 = h1_tag.text.strip() if h1_tag else "H1 not found"
-    
-    # Word count
     word_count = len(soup.get_text().split())
-    
-    # Image ALT analysis
     images = soup.find_all('img')
     missing_alt = sum(1 for img in images if not img.get('alt'))
-    
-    # Heading structure
     headings = {f"H{i}": len(soup.find_all(f"h{i}")) for i in range(1, 7)}
-    
-    # Keyword density (most frequent words)
     words = soup.get_text().lower().split()
     word_freq = {word: words.count(word) for word in set(words)}
     sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
-    
     return {
         "title": title,
         "meta_description": meta_desc,
@@ -100,31 +65,18 @@ def extract_seo_data(html, url):
 # Calculate SEO Score
 def calculate_seo_score(seo_data):
     score = 0
-    
-    # Title length
     if 50 <= len(seo_data["title"]) <= 60:
         score += 15
-    
-    # Meta description length
     if 120 <= len(seo_data["meta_description"]) <= 160:
         score += 15
-    
-    # H1 presence
     if seo_data["h1"] != "H1 not found":
         score += 15
-    
-    # Word count
     if seo_data["word_count"] >= 300:
         score += 15
-    
-    # Image ALT attributes
     if seo_data["missing_alt"] == 0:
         score += 15
-    
-    # H2 & H3 presence
     if seo_data["headings"]["H2"] > 0 and seo_data["headings"]["H3"] > 0:
         score += 10
-    
     return score
 
 # Streamlit UI
@@ -140,7 +92,6 @@ def main():
                 seo_data = extract_seo_data(html, url)
                 seo_score = calculate_seo_score(seo_data)
                 
-                # Display results
                 st.subheader("🔍 SEO Score:")
                 st.markdown(f"<div class='seo-score'>{seo_score} / 100</div>", unsafe_allow_html=True)
                 st.write(f"**Title:** {seo_data['title']}")
@@ -158,6 +109,20 @@ def main():
                 st.subheader("🔑 Keyword Density (Top 10):")
                 for word, count in seo_data["keyword_density"]:
                     st.write(f"**{word}**: {count} times")
+    
+    # To-Do Table for SEO Tasks
+    st.subheader("✅ SEO To-Do List")
+    todo_items = [
+        ["Optimize Title Length", "Ensure it's between 50-60 characters"],
+        ["Improve Meta Description", "Keep it between 120-160 characters"],
+        ["Fix Canonical Tag", "Ensure it matches the entered URL"],
+        ["Add H1", "Ensure there's a main heading on the page"],
+        ["Increase Word Count", "Ensure at least 300 words"],
+        ["Add ALT Text", "Ensure all images have descriptive alt text"],
+        ["Check Heading Structure", "Ensure H2 and H3 are used correctly"]
+    ]
+    df_todo = pd.DataFrame(todo_items, columns=["Task", "Description"])
+    st.table(df_todo)
 
 if __name__ == "__main__":
     main()
