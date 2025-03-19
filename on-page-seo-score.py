@@ -54,13 +54,11 @@ def extract_indexability_data(url, soup):
 # Extract SEO-related data
 def extract_seo_data(html, url):
     soup = BeautifulSoup(html, 'html.parser')
+    
     title = soup.title.string.strip() if soup.title else "Title not found"
     meta_desc_tag = soup.find('meta', attrs={'name': 'description'})
     og_desc_tag = soup.find('meta', attrs={'property': 'og:description'})
     meta_desc = meta_desc_tag['content'].strip() if meta_desc_tag and meta_desc_tag.get('content') else og_desc_tag['content'].strip() if og_desc_tag and og_desc_tag.get('content') else "Meta description not found"
-    canonical_tag = soup.find('link', rel='canonical')
-    canonical_url = canonical_tag['href'].strip() if canonical_tag else "Canonical tag not found"
-    is_canonical_correct = "✅ Matches Entered URL" if canonical_url == url else "❌ Does Not Match Entered URL"
     h1_tag = soup.find('h1')
     h1 = h1_tag.text.strip() if h1_tag else "H1 not found"
     word_count = len(soup.get_text().split())
@@ -70,17 +68,33 @@ def extract_seo_data(html, url):
     words = soup.get_text().lower().split()
     word_freq = {word: words.count(word) for word in set(words)}
     sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
+    
+    # Ensure indexability data is always a dictionary
+    try:
+        indexability_data = extract_indexability_data(url, soup)
+    except Exception as e:
+        indexability_data = {
+            "Canonical URL": "Error",
+            "Self-Canonical": "Error",
+            "Robots.txt": "Error",
+            "Robots Meta Tag": "Error",
+            "X-Robots-Tag HTTP": "Error",
+            "Sitemaps": "Error",
+            "Hreflangs": "Error"
+        }
+        st.error(f"Indexability Extraction Failed: {e}")
+    
     return {
         "title": title,
         "meta_description": meta_desc,
-        "canonical_url": canonical_url,
-        "canonical_status": is_canonical_correct,
         "h1": h1,
         "word_count": word_count,
         "missing_alt": missing_alt,
         "headings": headings,
-        "keyword_density": sorted_keywords
+        "keyword_density": sorted_keywords,
+        "indexability": indexability_data  # Ensuring it's always returned
     }
+
 
 # Calculate SEO Score
 def calculate_seo_score(seo_data):
