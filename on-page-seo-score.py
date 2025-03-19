@@ -97,6 +97,36 @@ def extract_seo_data(html, url):
         "keyword_density": sorted_keywords
     }
 
+# Calculate SEO Score
+def calculate_seo_score(seo_data):
+    score = 0
+    
+    # Title length
+    if 50 <= len(seo_data["title"]) <= 60:
+        score += 15
+    
+    # Meta description length
+    if 120 <= len(seo_data["meta_description"]) <= 160:
+        score += 15
+    
+    # H1 presence
+    if seo_data["h1"] != "H1 not found":
+        score += 15
+    
+    # Word count
+    if seo_data["word_count"] >= 300:
+        score += 15
+    
+    # Image ALT attributes
+    if seo_data["missing_alt"] == 0:
+        score += 15
+    
+    # H2 & H3 presence
+    if seo_data["headings"]["H2"] > 0 and seo_data["headings"]["H3"] > 0:
+        score += 10
+    
+    return score
+
 # Streamlit UI
 def main():
     inject_custom_css()
@@ -108,9 +138,11 @@ def main():
             html = fetch_html(url)
             if html:
                 seo_data = extract_seo_data(html, url)
+                seo_score = calculate_seo_score(seo_data)
                 
                 # Display results
                 st.subheader("🔍 SEO Score:")
+                st.markdown(f"<div class='seo-score'>{seo_score} / 100</div>", unsafe_allow_html=True)
                 st.write(f"**Title:** {seo_data['title']}")
                 st.write(f"**Meta Description:** {seo_data['meta_description']}")
                 st.write(f"**Canonical URL:** {seo_data['canonical_url']}")
@@ -126,21 +158,6 @@ def main():
                 st.subheader("🔑 Keyword Density (Top 10):")
                 for word, count in seo_data["keyword_density"]:
                     st.write(f"**{word}**: {count} times")
-                
-                # Display Instructions in a Table
-                st.subheader("📌 SEO Improvement Instructions:")
-                instructions = {
-                    "Improve Title": "Ensure the title is 50-60 characters.",
-                    "Optimize Meta Description": "Keep it between 120-160 characters.",
-                    "Fix Canonical URL": "Make sure the canonical URL matches the entered URL.",
-                    "Add H1": "Ensure an H1 tag is present.",
-                    "Increase Word Count": "Aim for at least 300 words.",
-                    "Fix ALT Tags": "Add ALT attributes to all images.",
-                    "Improve Heading Structure": "Use H2s and H3s for better readability.",
-                    "Optimize Keywords": "Use relevant keywords naturally."
-                }
-                df_instructions = pd.DataFrame(list(instructions.items()), columns=["Action", "Instruction"])
-                st.table(df_instructions)
 
 if __name__ == "__main__":
     main()
