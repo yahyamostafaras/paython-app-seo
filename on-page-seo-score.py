@@ -30,7 +30,27 @@ def fetch_html(url):
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching the URL: {e}")
         return None
-
+# Extract Indexability Data
+def extract_indexability_data(url, soup):
+    canonical_tag = soup.find('link', rel='canonical')
+    canonical_url = canonical_tag['href'].strip() if canonical_tag else "Missing"
+    robots_meta = soup.find('meta', attrs={'name': 'robots'})
+    robots_meta_content = robots_meta['content'] if robots_meta else "Missing"
+    x_robots_tag = soup.find('meta', attrs={'http-equiv': 'X-Robots-Tag'})
+    x_robots_content = x_robots_tag['content'] if x_robots_tag else "Missing"
+    sitemap_url = f"{url}/sitemap.xml"
+    robots_txt_url = f"{url}/robots.txt"
+    hreflang_tags = soup.find_all('link', rel='alternate', hreflang=True)
+    hreflangs = len(hreflang_tags) if hreflang_tags else "Missing"
+    return {
+        "Canonical URL": canonical_url,
+        "Self-Canonical": "✅ Matches Entered URL" if canonical_url == url else "❌ Does Not Match Entered URL",
+        "Robots.txt": robots_txt_url,
+        "Robots Meta Tag": robots_meta_content,
+        "X-Robots-Tag HTTP": x_robots_content,
+        "Sitemaps": sitemap_url,
+        "Hreflangs": hreflangs
+    }
 # Extract SEO-related data
 def extract_seo_data(html, url):
     soup = BeautifulSoup(html, 'html.parser')
