@@ -142,7 +142,17 @@ def main():
                 st.subheader("🔑 Keyword Density (Top 10):")
                 for word, count in seo_data["keyword_density"]:
                     st.write(f"**{word}**: {count} times")
-                
+                # Indexability Section
+                st.subheader("🛠️ Indexability")
+                indexability = seo_data["indexability"]
+                st.write(f"**Canonical URL:** {indexability['Canonical URL']}")
+                st.write(f"**Self-Canonical:** {indexability['Self-Canonical']}")
+                st.write(f"**Robots.txt:** {indexability['Robots.txt']}")
+                st.write(f"**Robots Meta Tag:** {indexability['Robots Meta Tag']}")
+                st.write(f"**X-Robots-Tag HTTP:** {indexability['X-Robots-Tag HTTP']}")
+                st.write(f"**Sitemaps:** {indexability['Sitemaps']}")
+                st.write(f"**Hreflangs:** {indexability['Hreflangs']}")
+
                 # Dynamic To-Do Table
                 if todo_items:
                     st.subheader("✅ SEO To-Do List")
