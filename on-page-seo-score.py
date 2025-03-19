@@ -2,9 +2,9 @@ import streamlit as st
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
-from io import BytesIO
+from urllib.parse import urlparse
 
-# Inject Custom CSS for Modern Styling
+# Inject Custom CSS
 def inject_custom_css():
     st.markdown(
         """
@@ -13,15 +13,14 @@ def inject_custom_css():
         .stButton { text-align: center !important; display: flex; justify-content: center; }
         .stTextInput>div>div>input { text-align: center !important; }
         body { font-family: 'Arial', sans-serif; background-color: #f8f9fa; color: #333; }
-        .reportview-container { padding-top: 2rem; }
-        .stMarkdown h2 { color: #007bff; }
         .seo-score { font-size: 2rem; font-weight: bold; text-align: center; color: #28a745; }
+        .stTable { margin-top: 20px; }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-# Fetch HTML from the given URL
+# Fetch HTML from URL
 def fetch_html(url):
     try:
         response = requests.get(url, timeout=10)
@@ -35,41 +34,62 @@ def fetch_html(url):
 def extract_indexability_data(url, soup):
     canonical_tag = soup.find('link', rel='canonical')
     canonical_url = canonical_tag['href'].strip() if canonical_tag else "Missing"
+    
     robots_meta = soup.find('meta', attrs={'name': 'robots'})
     robots_meta_content = robots_meta['content'] if robots_meta else "Missing"
+    
     x_robots_tag = soup.find('meta', attrs={'http-equiv': 'X-Robots-Tag'})
     x_robots_content = x_robots_tag['content'] if x_robots_tag else "Missing"
-    sitemap_url = f"{url}/sitemap.xml"
-    robots_txt_url = f"{url}/robots.txt"
+    
+    # Get Sitemap URL Correctly
+    sitemap_tag = soup.find('link', rel='sitemap')
+    if sitemap_tag and sitemap_tag.get('href'):
+        sitemap_url = sitemap_tag['href']
+    else:
+        parsed_url = urlparse(url)
+        sitemap_url = f"{parsed_url.scheme}://{parsed_url.netloc}/sitemap.xml"
+    
+    robots_txt_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
+    
     hreflang_tags = soup.find_all('link', rel='alternate', hreflang=True)
     hreflangs = len(hreflang_tags) if hreflang_tags else "Missing"
+    
     return {
         "Canonical URL": canonical_url,
-        "Self-Canonical": "✅ Matches Entered URL" if canonical_url == url else "❌ Does Not Match Entered URL",
+        "Self-Canonical": "✅ Matches URL" if canonical_url == url else "❌ Does Not Match",
         "Robots.txt": robots_txt_url,
         "Robots Meta Tag": robots_meta_content,
         "X-Robots-Tag HTTP": x_robots_content,
-        "Sitemaps": sitemap_url,
+        "Sitemap": sitemap_url,
         "Hreflangs": hreflangs
     }
 
-# Extract SEO-related data
+# Extract SEO Data
 def extract_seo_data(html, url):
     soup = BeautifulSoup(html, 'html.parser')
+    
     title = soup.title.string.strip() if soup.title else "Title not found"
+    
     meta_desc_tag = soup.find('meta', attrs={'name': 'description'})
     og_desc_tag = soup.find('meta', attrs={'property': 'og:description'})
     meta_desc = meta_desc_tag['content'].strip() if meta_desc_tag and meta_desc_tag.get('content') else og_desc_tag['content'].strip() if og_desc_tag and og_desc_tag.get('content') else "Meta description not found"
+    
     h1_tag = soup.find('h1')
     h1 = h1_tag.text.strip() if h1_tag else "H1 not found"
+    
     word_count = len(soup.get_text().split())
+    
     images = soup.find_all('img')
     missing_alt = sum(1 for img in images if not img.get('alt'))
+    
     headings = {f"H{i}": len(soup.find_all(f"h{i}")) for i in range(1, 7)}
+    
     words = soup.get_text().lower().split()
     word_freq = {word: words.count(word) for word in set(words)}
     sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
+    
     indexability_data = extract_indexability_data(url, soup)
+    
     return {
         "title": title,
         "meta_description": meta_desc,
@@ -81,37 +101,37 @@ def extract_seo_data(html, url):
         "indexability": indexability_data
     }
 
-# Generate To-Do List Based on SEO Issues
+# Generate To-Do List
 def generate_todo_list(seo_data):
     todo_list = []
 
     if seo_data["title"] == "Title not found":
-        todo_list.append(["Title Tag", "Add a title tag for better SEO."])
+        todo_list.append(["Title Tag", "Add a proper title for SEO."])
     
     if seo_data["meta_description"] == "Meta description not found":
-        todo_list.append(["Meta Description", "Add a meta description to improve search appearance."])
+        todo_list.append(["Meta Description", "Add a relevant meta description."])
     
     if seo_data["h1"] == "H1 not found":
-        todo_list.append(["H1 Tag", "Ensure there is an H1 tag for page structure."])
+        todo_list.append(["H1 Tag", "Ensure there is a primary H1 tag."])
     
     if seo_data["word_count"] < 300:
-        todo_list.append(["Content Length", "Increase word count to at least 300 for better SEO."])
+        todo_list.append(["Content Length", "Increase word count to at least 300+."])
     
     if seo_data["missing_alt"] > 0:
-        todo_list.append(["Image ALT Tags", f"Add ALT tags to {seo_data['missing_alt']} images."])
+        todo_list.append(["Image ALT Tags", f"Add ALT text to {seo_data['missing_alt']} images."])
     
     indexability = seo_data["indexability"]
     if indexability["Canonical URL"] == "Missing":
-        todo_list.append(["Canonical URL", "Add a canonical URL to prevent duplicate content issues."])
+        todo_list.append(["Canonical URL", "Add a canonical URL to prevent duplicate content."])
     
     if indexability["Robots Meta Tag"] == "Missing":
-        todo_list.append(["Robots Meta Tag", "Consider adding a robots meta tag for better control."])
+        todo_list.append(["Robots Meta Tag", "Add a robots meta tag for better control."])
     
     if indexability["X-Robots-Tag HTTP"] == "Missing":
         todo_list.append(["X-Robots-Tag", "Consider setting an X-Robots-Tag HTTP header."])
     
     if indexability["Hreflangs"] == "Missing":
-        todo_list.append(["Hreflang Tags", "Add hreflang tags if the site has multiple languages."])
+        todo_list.append(["Hreflang Tags", "Add hreflang tags for multilingual sites."])
     
     return todo_list
 
@@ -150,7 +170,7 @@ def main():
                 st.write(f"**Robots.txt:** {indexability['Robots.txt']}")
                 st.write(f"**Robots Meta Tag:** {indexability['Robots Meta Tag']}")
                 st.write(f"**X-Robots-Tag HTTP:** {indexability['X-Robots-Tag HTTP']}")
-                st.write(f"**Sitemaps:** {indexability['Sitemaps']}")
+                st.write(f"**Sitemap:** {indexability['Sitemap']}")
                 st.write(f"**Hreflangs:** {indexability['Hreflangs']}")
 
                 # To-Do List Section
