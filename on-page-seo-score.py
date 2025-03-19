@@ -65,19 +65,32 @@ def extract_seo_data(html, url):
 # Calculate SEO Score
 def calculate_seo_score(seo_data):
     score = 0
+    tasks = []
     if 50 <= len(seo_data["title"]) <= 60:
         score += 15
+    else:
+        tasks.append(["Optimize Title Length", "Ensure it's between 50-60 characters"])
     if 120 <= len(seo_data["meta_description"]) <= 160:
         score += 15
+    else:
+        tasks.append(["Improve Meta Description", "Keep it between 120-160 characters"])
     if seo_data["h1"] != "H1 not found":
         score += 15
+    else:
+        tasks.append(["Add H1", "Ensure there's a main heading on the page"])
     if seo_data["word_count"] >= 300:
         score += 15
+    else:
+        tasks.append(["Increase Word Count", "Ensure at least 300 words"])
     if seo_data["missing_alt"] == 0:
         score += 15
-    if seo_data["headings"]["H2"] > 0 and seo_data["headings"]["H3"] > 0:
+    else:
+        tasks.append(["Add ALT Text", "Ensure all images have descriptive alt text"])
+    if seo_data["headings"].get("H2", 0) > 0 and seo_data["headings"].get("H3", 0) > 0:
         score += 10
-    return score
+    else:
+        tasks.append(["Check Heading Structure", "Ensure H2 and H3 are used correctly"])
+    return score, tasks
 
 # Streamlit UI
 def main():
@@ -90,7 +103,7 @@ def main():
             html = fetch_html(url)
             if html:
                 seo_data = extract_seo_data(html, url)
-                seo_score = calculate_seo_score(seo_data)
+                seo_score, todo_items = calculate_seo_score(seo_data)
                 
                 st.subheader("🔍 SEO Score:")
                 st.markdown(f"<div class='seo-score'>{seo_score} / 100</div>", unsafe_allow_html=True)
@@ -109,20 +122,14 @@ def main():
                 st.subheader("🔑 Keyword Density (Top 10):")
                 for word, count in seo_data["keyword_density"]:
                     st.write(f"**{word}**: {count} times")
-    
-    # To-Do Table for SEO Tasks
-    st.subheader("✅ SEO To-Do List")
-    todo_items = [
-        ["Optimize Title Length", "Ensure it's between 50-60 characters"],
-        ["Improve Meta Description", "Keep it between 120-160 characters"],
-        ["Fix Canonical Tag", "Ensure it matches the entered URL"],
-        ["Add H1", "Ensure there's a main heading on the page"],
-        ["Increase Word Count", "Ensure at least 300 words"],
-        ["Add ALT Text", "Ensure all images have descriptive alt text"],
-        ["Check Heading Structure", "Ensure H2 and H3 are used correctly"]
-    ]
-    df_todo = pd.DataFrame(todo_items, columns=["Task", "Description"])
-    st.table(df_todo)
+                
+                # Dynamic To-Do Table
+                if todo_items:
+                    st.subheader("✅ SEO To-Do List")
+                    df_todo = pd.DataFrame(todo_items, columns=["Task", "Description"])
+                    st.table(df_todo)
+                else:
+                    st.success("No issues found! Your SEO score is optimal.")
 
 if __name__ == "__main__":
     main()
