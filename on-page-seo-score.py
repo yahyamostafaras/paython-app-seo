@@ -30,6 +30,7 @@ def fetch_html(url):
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching the URL: {e}")
         return None
+
 # Extract Indexability Data
 def extract_indexability_data(url, soup):
     canonical_tag = soup.find('link', rel='canonical')
@@ -51,10 +52,10 @@ def extract_indexability_data(url, soup):
         "Sitemaps": sitemap_url,
         "Hreflangs": hreflangs
     }
+
 # Extract SEO-related data
 def extract_seo_data(html, url):
     soup = BeautifulSoup(html, 'html.parser')
-    
     title = soup.title.string.strip() if soup.title else "Title not found"
     meta_desc_tag = soup.find('meta', attrs={'name': 'description'})
     og_desc_tag = soup.find('meta', attrs={'property': 'og:description'})
@@ -68,22 +69,7 @@ def extract_seo_data(html, url):
     words = soup.get_text().lower().split()
     word_freq = {word: words.count(word) for word in set(words)}
     sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
-    
-    # Ensure indexability data is always a dictionary
-    try:
-        indexability_data = extract_indexability_data(url, soup)
-    except Exception as e:
-        indexability_data = {
-            "Canonical URL": "Error",
-            "Self-Canonical": "Error",
-            "Robots.txt": "Error",
-            "Robots Meta Tag": "Error",
-            "X-Robots-Tag HTTP": "Error",
-            "Sitemaps": "Error",
-            "Hreflangs": "Error"
-        }
-        st.error(f"Indexability Extraction Failed: {e}")
-    
+    indexability_data = extract_indexability_data(url, soup)
     return {
         "title": title,
         "meta_description": meta_desc,
@@ -92,39 +78,8 @@ def extract_seo_data(html, url):
         "missing_alt": missing_alt,
         "headings": headings,
         "keyword_density": sorted_keywords,
-        "indexability": indexability_data  # Ensuring it's always returned
+        "indexability": indexability_data
     }
-
-
-# Calculate SEO Score
-def calculate_seo_score(seo_data):
-    score = 0
-    tasks = []
-    if 50 <= len(seo_data["title"]) <= 60:
-        score += 15
-    else:
-        tasks.append(["Optimize Title Length", "Ensure it's between 50-60 characters"])
-    if 120 <= len(seo_data["meta_description"]) <= 160:
-        score += 15
-    else:
-        tasks.append(["Improve Meta Description", "Keep it between 120-160 characters"])
-    if seo_data["h1"] != "H1 not found":
-        score += 15
-    else:
-        tasks.append(["Add H1", "Ensure there's a main heading on the page"])
-    if seo_data["word_count"] >= 300:
-        score += 15
-    else:
-        tasks.append(["Increase Word Count", "Ensure at least 300 words"])
-    if seo_data["missing_alt"] == 0:
-        score += 15
-    else:
-        tasks.append(["Add ALT Text", "Ensure all images have descriptive alt text"])
-    if seo_data["headings"].get("H2", 0) > 0 and seo_data["headings"].get("H3", 0) > 0:
-        score += 10
-    else:
-        tasks.append(["Check Heading Structure", "Ensure H2 and H3 are used correctly"])
-    return score, tasks
 
 # Streamlit UI
 def main():
@@ -137,14 +92,10 @@ def main():
             html = fetch_html(url)
             if html:
                 seo_data = extract_seo_data(html, url)
-                seo_score, todo_items = calculate_seo_score(seo_data)
                 
                 st.subheader("🔍 SEO Score:")
-                st.markdown(f"<div class='seo-score'>{seo_score} / 100</div>", unsafe_allow_html=True)
                 st.write(f"**Title:** {seo_data['title']}")
                 st.write(f"**Meta Description:** {seo_data['meta_description']}")
-                st.write(f"**Canonical URL:** {seo_data['canonical_url']}")
-                st.write(f"**Canonical Status:** {seo_data['canonical_status']}")
                 st.write(f"**H1:** {seo_data['h1']}")
                 st.write(f"**Word Count:** {seo_data['word_count']}")
                 st.write(f"**Images Missing ALT:** {seo_data['missing_alt']}")
@@ -156,6 +107,7 @@ def main():
                 st.subheader("🔑 Keyword Density (Top 10):")
                 for word, count in seo_data["keyword_density"]:
                     st.write(f"**{word}**: {count} times")
+                
                 # Indexability Section
                 st.subheader("🛠️ Indexability")
                 indexability = seo_data["indexability"]
@@ -166,14 +118,6 @@ def main():
                 st.write(f"**X-Robots-Tag HTTP:** {indexability['X-Robots-Tag HTTP']}")
                 st.write(f"**Sitemaps:** {indexability['Sitemaps']}")
                 st.write(f"**Hreflangs:** {indexability['Hreflangs']}")
-
-                # Dynamic To-Do Table
-                if todo_items:
-                    st.subheader("✅ SEO To-Do List")
-                    df_todo = pd.DataFrame(todo_items, columns=["Task", "Description"])
-                    st.table(df_todo)
-                else:
-                    st.success("No issues found! Your SEO score is optimal.")
 
 if __name__ == "__main__":
     main()
