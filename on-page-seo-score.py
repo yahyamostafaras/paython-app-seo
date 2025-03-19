@@ -81,6 +81,40 @@ def extract_seo_data(html, url):
         "indexability": indexability_data
     }
 
+# Generate To-Do List Based on SEO Issues
+def generate_todo_list(seo_data):
+    todo_list = []
+
+    if seo_data["title"] == "Title not found":
+        todo_list.append(["Title Tag", "Add a title tag for better SEO."])
+    
+    if seo_data["meta_description"] == "Meta description not found":
+        todo_list.append(["Meta Description", "Add a meta description to improve search appearance."])
+    
+    if seo_data["h1"] == "H1 not found":
+        todo_list.append(["H1 Tag", "Ensure there is an H1 tag for page structure."])
+    
+    if seo_data["word_count"] < 300:
+        todo_list.append(["Content Length", "Increase word count to at least 300 for better SEO."])
+    
+    if seo_data["missing_alt"] > 0:
+        todo_list.append(["Image ALT Tags", f"Add ALT tags to {seo_data['missing_alt']} images."])
+    
+    indexability = seo_data["indexability"]
+    if indexability["Canonical URL"] == "Missing":
+        todo_list.append(["Canonical URL", "Add a canonical URL to prevent duplicate content issues."])
+    
+    if indexability["Robots Meta Tag"] == "Missing":
+        todo_list.append(["Robots Meta Tag", "Consider adding a robots meta tag for better control."])
+    
+    if indexability["X-Robots-Tag HTTP"] == "Missing":
+        todo_list.append(["X-Robots-Tag", "Consider setting an X-Robots-Tag HTTP header."])
+    
+    if indexability["Hreflangs"] == "Missing":
+        todo_list.append(["Hreflang Tags", "Add hreflang tags if the site has multiple languages."])
+    
+    return todo_list
+
 # Streamlit UI
 def main():
     inject_custom_css()
@@ -118,6 +152,15 @@ def main():
                 st.write(f"**X-Robots-Tag HTTP:** {indexability['X-Robots-Tag HTTP']}")
                 st.write(f"**Sitemaps:** {indexability['Sitemaps']}")
                 st.write(f"**Hreflangs:** {indexability['Hreflangs']}")
+
+                # To-Do List Section
+                st.subheader("✅ SEO To-Do List")
+                todo_list = generate_todo_list(seo_data)
+                if todo_list:
+                    df = pd.DataFrame(todo_list, columns=["Issue", "Recommended Action"])
+                    st.table(df)
+                else:
+                    st.success("No major SEO issues found!")
 
 if __name__ == "__main__":
     main()
