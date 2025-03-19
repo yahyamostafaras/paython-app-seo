@@ -13,8 +13,7 @@ def inject_custom_css():
         .stButton { text-align: center !important; display: flex; justify-content: center; }
         .stTextInput>div>div>input { text-align: center !important; }
         body { font-family: 'Arial', sans-serif; background-color: #f8f9fa; color: #333; }
-        .seo-score { font-size: 2rem; font-weight: bold; text-align: center; color: #28a745; }
-        .stTable { margin-top: 20px; }
+        .seo-score { font-size: 2rem; font-weight: bold; text-align: center; }
         </style>
         """,
         unsafe_allow_html=True
@@ -49,17 +48,13 @@ def extract_indexability_data(url, soup):
         parsed_url = urlparse(url)
         sitemap_url = f"{parsed_url.scheme}://{parsed_url.netloc}/sitemap.xml"
     
-    robots_txt_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
-    
     hreflang_tags = soup.find_all('link', rel='alternate', hreflang=True)
     hreflangs = len(hreflang_tags) if hreflang_tags else "Missing"
     
     return {
         "Canonical URL": canonical_url,
         "Self-Canonical": "✅ Matches URL" if canonical_url == url else "❌ Does Not Match",
-        "Robots.txt": robots_txt_url,
         "Robots Meta Tag": robots_meta_content,
-        "X-Robots-Tag HTTP": x_robots_content,
         "Sitemap": sitemap_url,
         "Hreflangs": hreflangs
     }
@@ -82,12 +77,6 @@ def extract_seo_data(html, url):
     images = soup.find_all('img')
     missing_alt = sum(1 for img in images if not img.get('alt'))
     
-    headings = {f"H{i}": len(soup.find_all(f"h{i}")) for i in range(1, 7)}
-    
-    words = soup.get_text().lower().split()
-    word_freq = {word: words.count(word) for word in set(words)}
-    sorted_keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
-    
     indexability_data = extract_indexability_data(url, soup)
     
     return {
@@ -96,44 +85,39 @@ def extract_seo_data(html, url):
         "h1": h1,
         "word_count": word_count,
         "missing_alt": missing_alt,
-        "headings": headings,
-        "keyword_density": sorted_keywords,
         "indexability": indexability_data
     }
 
-# Generate To-Do List
-def generate_todo_list(seo_data):
-    todo_list = []
+# Calculate SEO Score
+def calculate_seo_score(seo_data):
+    score = 100
 
     if seo_data["title"] == "Title not found":
-        todo_list.append(["Title Tag", "Add a proper title for SEO."])
-    
+        score -= 10
+
     if seo_data["meta_description"] == "Meta description not found":
-        todo_list.append(["Meta Description", "Add a relevant meta description."])
-    
+        score -= 10
+
     if seo_data["h1"] == "H1 not found":
-        todo_list.append(["H1 Tag", "Ensure there is a primary H1 tag."])
-    
+        score -= 10
+
     if seo_data["word_count"] < 300:
-        todo_list.append(["Content Length", "Increase word count to at least 300+."])
-    
+        score -= 10
+
     if seo_data["missing_alt"] > 0:
-        todo_list.append(["Image ALT Tags", f"Add ALT text to {seo_data['missing_alt']} images."])
-    
+        score -= 10
+
     indexability = seo_data["indexability"]
     if indexability["Canonical URL"] == "Missing":
-        todo_list.append(["Canonical URL", "Add a canonical URL to prevent duplicate content."])
-    
+        score -= 10
+
     if indexability["Robots Meta Tag"] == "Missing":
-        todo_list.append(["Robots Meta Tag", "Add a robots meta tag for better control."])
-    
-    if indexability["X-Robots-Tag HTTP"] == "Missing":
-        todo_list.append(["X-Robots-Tag", "Consider setting an X-Robots-Tag HTTP header."])
-    
+        score -= 5
+
     if indexability["Hreflangs"] == "Missing":
-        todo_list.append(["Hreflang Tags", "Add hreflang tags for multilingual sites."])
-    
-    return todo_list
+        score -= 5
+
+    return max(score, 0)
 
 # Streamlit UI
 def main():
@@ -146,41 +130,30 @@ def main():
             html = fetch_html(url)
             if html:
                 seo_data = extract_seo_data(html, url)
-                
-                st.subheader("🔍 SEO Score:")
+                seo_score = calculate_seo_score(seo_data)
+
+                # Display SEO Score
+                st.subheader("📊 SEO Score")
+                st.progress(seo_score / 100)
+                color = "🟢" if seo_score >= 90 else "🟡" if seo_score >= 70 else "🔴"
+                st.markdown(f"<p class='seo-score'>{color} **{seo_score}/100**</p>", unsafe_allow_html=True)
+
+                # Display SEO Data
+                st.subheader("🔍 SEO Data")
                 st.write(f"**Title:** {seo_data['title']}")
                 st.write(f"**Meta Description:** {seo_data['meta_description']}")
                 st.write(f"**H1:** {seo_data['h1']}")
                 st.write(f"**Word Count:** {seo_data['word_count']}")
                 st.write(f"**Images Missing ALT:** {seo_data['missing_alt']}")
                 
-                st.subheader("📊 Heading Structure:")
-                for h, count in seo_data["headings"].items():
-                    st.write(f"**{h}:** {count}")
-                
-                st.subheader("🔑 Keyword Density (Top 10):")
-                for word, count in seo_data["keyword_density"]:
-                    st.write(f"**{word}**: {count} times")
-                
                 # Indexability Section
                 st.subheader("🛠️ Indexability")
                 indexability = seo_data["indexability"]
                 st.write(f"**Canonical URL:** {indexability['Canonical URL']}")
                 st.write(f"**Self-Canonical:** {indexability['Self-Canonical']}")
-                st.write(f"**Robots.txt:** {indexability['Robots.txt']}")
                 st.write(f"**Robots Meta Tag:** {indexability['Robots Meta Tag']}")
-                st.write(f"**X-Robots-Tag HTTP:** {indexability['X-Robots-Tag HTTP']}")
                 st.write(f"**Sitemap:** {indexability['Sitemap']}")
                 st.write(f"**Hreflangs:** {indexability['Hreflangs']}")
-
-                # To-Do List Section
-                st.subheader("✅ SEO To-Do List")
-                todo_list = generate_todo_list(seo_data)
-                if todo_list:
-                    df = pd.DataFrame(todo_list, columns=["Issue", "Recommended Action"])
-                    st.table(df)
-                else:
-                    st.success("No major SEO issues found!")
 
 if __name__ == "__main__":
     main()
