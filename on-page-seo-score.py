@@ -126,6 +126,21 @@ def main():
                 st.subheader("🔑 Keyword Density (Top 10):")
                 for word, count in seo_data["keyword_density"]:
                     st.write(f"**{word}**: {count} times")
+                
+                # Display Instructions in a Table
+                st.subheader("📌 SEO Improvement Instructions:")
+                instructions = {
+                    "Improve Title": "Ensure the title is 50-60 characters.",
+                    "Optimize Meta Description": "Keep it between 120-160 characters.",
+                    "Fix Canonical URL": "Make sure the canonical URL matches the entered URL.",
+                    "Add H1": "Ensure an H1 tag is present.",
+                    "Increase Word Count": "Aim for at least 300 words.",
+                    "Fix ALT Tags": "Add ALT attributes to all images.",
+                    "Improve Heading Structure": "Use H2s and H3s for better readability.",
+                    "Optimize Keywords": "Use relevant keywords naturally."
+                }
+                df_instructions = pd.DataFrame(list(instructions.items()), columns=["Action", "Instruction"])
+                st.table(df_instructions)
 
 if __name__ == "__main__":
     main()
